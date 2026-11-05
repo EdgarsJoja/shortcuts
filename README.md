@@ -79,6 +79,10 @@ shortcuts version [--json]
 
 ## TUI
 
+The interface is centered in a content column with a maximum width of 100
+columns, so it stays readable on wide terminals; the margins use the active
+theme's background.
+
 ```
 a            add a shortcut
 e / enter    view/edit details

@@ -69,9 +69,20 @@ func newModel(store *config.Store, mgr *shim.Manager, cfg config.Config) Model {
 		height:    24,
 		themeName: themeName,
 	}
-	m.list = newList(cfg, m.width, m.height-2)
+	m.list = newList(cfg, m.contentWidth(), m.height-2)
 	m.stamp = statStamp(store.Path())
 	return m
+}
+
+// contentWidth is the width of the centered content column.
+func (m Model) contentWidth() int {
+	if m.width <= 0 {
+		return 80
+	}
+	if m.width > maxContentWidth {
+		return maxContentWidth
+	}
+	return m.width
 }
 
 func (m Model) Init() tea.Cmd { return nil }
@@ -80,8 +91,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.list.SetSize(msg.Width, max(1, msg.Height-2))
-		m.form.setWidth(msg.Width)
+		m.list.SetSize(m.contentWidth(), max(1, m.height-2))
+		m.form.setWidth(m.contentWidth())
 		return m, nil
 
 	case savedMsg:
@@ -185,7 +196,10 @@ func newList(cfg config.Config, w, h int) list.Model {
 	delegate.Styles.SelectedTitle = paint(themed(delegate.Styles.SelectedTitle, activePalette.Accent))
 	delegate.Styles.SelectedDesc = paint(themed(delegate.Styles.SelectedDesc, activePalette.Accent2))
 	if activePalette.Accent != "" {
+		// SelectedDesc inherits a left border from SelectedTitle in Bubbles'
+		// default delegate. Recolor both so the two-line gutter is one color.
 		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.BorderForeground(lipgloss.Color(activePalette.Accent))
+		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.BorderForeground(lipgloss.Color(activePalette.Accent))
 	}
 	delegate.Styles.DimmedTitle = paint(themed(delegate.Styles.DimmedTitle, activePalette.Muted))
 	delegate.Styles.DimmedDesc = paint(themed(delegate.Styles.DimmedDesc, activePalette.Muted))
@@ -248,7 +262,7 @@ func (m *Model) rebuildList() {
 	if it, ok := m.list.SelectedItem().(shortcutItem); ok {
 		selected = it.name
 	}
-	m.list = newList(m.cfg, m.width, max(1, m.height-2))
+	m.list = newList(m.cfg, m.contentWidth(), max(1, m.height-2))
 	if selected == "" {
 		return
 	}
@@ -425,7 +439,7 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) startForm(name string) (tea.Model, tea.Cmd) {
 	f := newForm()
-	f.width = m.width
+	f.width = m.contentWidth()
 	f.resize()
 
 	if name != "" {

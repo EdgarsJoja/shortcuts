@@ -10,6 +10,10 @@ import (
 	"github.com/ejoja/shortcuts/internal/theme"
 )
 
+// maxContentWidth keeps lines readable on wide terminals; the content column is
+// centered and the margins are painted with the theme background.
+const maxContentWidth = 100
+
 var (
 	activePalette = theme.Default()
 
@@ -129,34 +133,44 @@ func themeHelpStyles(s help.Styles) help.Styles {
 // start of every line and re-apply it after every reset, which also covers
 // per-component gaps and right-edge padding.
 func fillScreen(content string, width, height int) string {
-	if activePalette.Background == "" || width <= 0 || height <= 0 {
-		return content
-	}
-	seq := backgroundSequence(activePalette.Background)
-	if seq == "" {
+	if width <= 0 || height <= 0 {
 		return content
 	}
 
+	contentWidth := width
+	if contentWidth > maxContentWidth {
+		contentWidth = maxContentWidth
+	}
+	left := (width - contentWidth) / 2
+	right := width - contentWidth - left
+
 	const reset = "\x1b[0m"
+
+	seq := ""
+	if activePalette.Background != "" {
+		seq = backgroundSequence(activePalette.Background)
+	}
 
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
 		// Truncate before padding: Bubble Tea truncates at the terminal width,
 		// and doing it ourselves keeps a trailing reset from being cut off,
 		// which could leak SGR state into the next line.
-		line = ansi.Truncate(line, width, "") + reset
-		if w := ansi.StringWidth(line); w < width {
-			line += strings.Repeat(" ", width-w)
+		line = ansi.Truncate(line, contentWidth, "") + reset
+		if w := ansi.StringWidth(line); w < contentWidth {
+			line += strings.Repeat(" ", contentWidth-w)
 		}
-		lines[i] = line
+		lines[i] = strings.Repeat(" ", left) + line + strings.Repeat(" ", right)
 	}
 	blank := strings.Repeat(" ", width)
 	for len(lines) < height {
 		lines = append(lines, blank)
 	}
 
-	for i, line := range lines {
-		lines[i] = seq + strings.ReplaceAll(line, reset, reset+seq) + reset
+	if seq != "" {
+		for i, line := range lines {
+			lines[i] = seq + strings.ReplaceAll(line, reset, reset+seq) + reset
+		}
 	}
 	return strings.Join(lines, "\n")
 }
